@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AssetTracking")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+150ec860165a895906d272317afd2d3e37c6e101")]
 [assembly: System.Reflection.AssemblyProductAttribute("AssetTracking")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AssetTracking")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
