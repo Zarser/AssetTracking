@@ -1,150 +1,151 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
-class Asset
+namespace AssetTracking
 {
-    public string ModelName { get; set; }       // Modellens namn
-    public DateTime PurchaseDate { get; set; }  // Inköpsdatum
-    public decimal Price { get; set; }          // Pris i SEK
-    public string AssetType { get; set; }       // Typ av tillgång (t.ex. dator, telefon)
-    public string Brand { get; set; }           // Märke
-    public DateTime EndOfLifeDate => PurchaseDate.AddYears(3); // Slutdatum (livslängd) är 3 år efter inköpsdatum
-
-    // Konstruktor för att skapa ett nytt Asset-objekt
-    public Asset(string brand, string modelName, DateTime purchaseDate, decimal price, string assetType)
+    class Program
     {
-        Brand = brand;
-        ModelName = modelName;
-        PurchaseDate = purchaseDate;
-        Price = price;
-        AssetType = assetType;
-    }
-
-    // Kolla om tillgången är mindre än 3 månader från att utgå (markerad röd)
-    public bool IsAboutToExpireRed() => (EndOfLifeDate - DateTime.Now).TotalDays <= 90 && (EndOfLifeDate - DateTime.Now).TotalDays >= 0;
-
-    // Kolla om tillgången är mindre än 6 månader men mer än 3 månader från att utgå (markerad gul)
-    public bool IsAboutToExpireYellow() => (EndOfLifeDate - DateTime.Now).TotalDays <= 180 && (EndOfLifeDate - DateTime.Now).TotalDays > 90;
-
-    // Kolla om tillgången har mer än 6 månader kvar (markerad grön)
-    public bool HasMoreThan6Months() => (EndOfLifeDate - DateTime.Now).TotalDays > 180;
-
-    // Kolla om tillgången redan har utgått (äldre än 3 år)
-    public bool IsExpired() => DateTime.Now > EndOfLifeDate;
-
-    // Metod för att visa information om tillgången med färgkod
-    public void DisplayInfo()
-    {
-        if (IsExpired())
+        static void Main(string[] args)
         {
-            Console.ForegroundColor = ConsoleColor.Gray; // Markera utgångna tillgångar i grått
-            Console.WriteLine($"{AssetType,-10} {Brand,-15} {ModelName,-20} {Price,10} SEK {PurchaseDate.ToShortDateString()}");
-        }
-        else if (IsAboutToExpireRed())
-        {
-            Console.ForegroundColor = ConsoleColor.Red; // Markera tillgångar som är mindre än 3 månader från att utgå i rött
-            Console.WriteLine($"{AssetType,-10} {Brand,-15} {ModelName,-20} {Price,10} SEK {PurchaseDate.ToShortDateString()}");
-        }
-        else if (IsAboutToExpireYellow())
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow; // Markera tillgångar som är mellan 3 och 6 månader från att utgå i gult
-            Console.WriteLine($"{AssetType,-10} {Brand,-15} {ModelName,-20} {Price,10} SEK {PurchaseDate.ToShortDateString()}");
-        }
-        else
-        {
-            Console.ForegroundColor = ConsoleColor.Green; // Markera tillgångar som har mer än 6 månader kvar i grönt
-            Console.WriteLine($"{AssetType,-10} {Brand,-15} {ModelName,-20} {Price,10} SEK {PurchaseDate.ToShortDateString()}");
+            List<Asset> assets = InitializeAssets();
+            Console.WriteLine("Välkommen till Asset Tracking System\n");
+
+            while (true)
+            {
+                // Get country and currency
+                var (selectedCountry, selectedCurrency) = GetCountryAndCurrency();
+                if (selectedCountry == "Ogiltig") continue;
+
+                // Get asset type
+                var assetType = GetAssetType();
+                if (assetType == null) continue;
+
+                // Filter and display assets
+                var selectedAssets = assets
+                    .Where(a => a.Country == selectedCountry && a.AssetType == assetType)
+                    .OrderByDescending(a => a.PurchaseDate)
+                    .ToList();
+
+                var conversionRates = GetCurrencyConversionRates(selectedCurrency);
+                DisplayAssets(selectedAssets, conversionRates, selectedCurrency);
+
+                // Ask if user wants to search again
+                if (!AskToSearchAgain()) break;
+            }
         }
 
-        Console.ResetColor(); // Återställ till standardfärg
-    }
-}
-
-class AssetTracker
-{
-    private List<Asset> assets = new List<Asset>(); // Lista för att lagra tillgångar
-
-    // Lägg till en ny tillgång till listan
-    public void AddAsset(string brand, string modelName, DateTime purchaseDate, decimal price, string assetType)
-    {
-        assets.Add(new Asset(brand, modelName, purchaseDate, price, assetType));
-    }
-
-    // Metod för att visa sorterade tillgångar
-    public void DisplayAssetsSorted()
-    {
-        // Sortering: först efter typ (datorer först), sedan efter färgkod (grön, gul, röd)
-        var sortedAssets = assets
-            .OrderBy(asset => asset.AssetType) // Sortera efter typ (datorer först, telefoner sen)
-            .ThenByDescending(asset => asset.HasMoreThan6Months()) // Grön först
-            .ThenByDescending(asset => asset.IsAboutToExpireYellow()) // Gul sedan
-            .ThenByDescending(asset => asset.IsAboutToExpireRed()) // Röd sist
-            .ThenBy(asset => asset.PurchaseDate); // Slutligen sortera efter inköpsdatum inom varje färgkod
-
-        // Rubriker för tabellen
-        Console.WriteLine($"{"Typ",-10} {"Märke",-15} {"Modell",-20} {"Pris",-10} {"Inköpsdatum"}");
-        Console.WriteLine(new string('-', 75));
-
-        // Visa varje tillgångs information
-        foreach (var asset in sortedAssets)
+        private static (string, string) GetCountryAndCurrency()
         {
-            asset.DisplayInfo();
+            Console.WriteLine("Välj Land/Kontor:\n1. USA (USD)\n2. Tyskland (EUR)\n3. Storbritannien (GBP)\n4. Sverige (SEK)");
+            int choice = int.Parse(Console.ReadLine() ?? "0");
+            return choice switch
+            {
+                1 => ("USA", "USD"),
+                2 => ("Tyskland", "EUR"),
+                3 => ("Storbritannien", "GBP"),
+                4 => ("Sverige", "SEK"),
+                _ => ("Ogiltig", "USD")
+            };
         }
 
-        // Visa färgförklaringen under listan
-        DisplayColorExplanation();
+        private static string GetAssetType()
+        {
+            Console.WriteLine("Välj Tillgångstyp:\n1. Laptops/Datorer\n2. Mobiltelefoner");
+            int choice = int.Parse(Console.ReadLine() ?? "0");
+            return choice switch
+            {
+                1 => "Laptop",
+                2 => "Mobiltelefon",
+                _ => null
+            };
+        }
+
+        private static Dictionary<string, decimal> GetCurrencyConversionRates(string baseCurrency)
+        {
+            var rates = new Dictionary<string, decimal> { { "USD", 1m }, { "EUR", 0.85m }, { "GBP", 0.75m }, { "SEK", 8.5m } };
+            return rates.ToDictionary(rate => rate.Key, rate => rate.Value / rates[baseCurrency]);
+        }
+
+        private static void DisplayAssets(List<Asset> assets, Dictionary<string, decimal> conversionRates, string currency)
+        {
+            Console.WriteLine($"\nTillgång       Märke      Modell      Pris i {currency}      Datum");
+            Console.WriteLine("------------------------------------------------------");
+            foreach (var asset in assets)
+            {
+                decimal convertedPrice = asset.Price * (conversionRates.ContainsKey(currency) ? conversionRates[currency] : 1);
+                Console.ForegroundColor = GetConsoleColor(GetColorCode(asset));
+                Console.WriteLine($"{asset.AssetType,-12} {asset.Brand,-10} {asset.Model,-10} {convertedPrice.ToString("C", CultureInfo.CurrentCulture),-15} {asset.PurchaseDate.ToShortDateString()}");
+            }
+            Console.ResetColor();
+        }
+
+        private static string GetColorCode(Asset asset)
+        {
+            int monthsToThreeYears = ((asset.PurchaseDate.AddYears(3).Year - DateTime.Now.Year) * 12) + asset.PurchaseDate.AddYears(3).Month - DateTime.Now.Month;
+            return monthsToThreeYears switch
+            {
+                < 0 => "DEFAULT",
+                <= 3 => "RED",
+                <= 6 => "YELLOW",
+                > 24 => "GREEN",
+                _ => "DEFAULT"
+            };
+        }
+
+        private static ConsoleColor GetConsoleColor(string colorCode) =>
+            colorCode switch
+            {
+                "RED" => ConsoleColor.Red,
+                "YELLOW" => ConsoleColor.Yellow,
+                "GREEN" => ConsoleColor.Green,
+                _ => ConsoleColor.White
+            };
+
+        private static bool AskToSearchAgain()
+        {
+            Console.WriteLine("\nVill du söka igen? (Y/N)");
+            return char.ToUpper(Console.ReadKey().KeyChar) == 'Y';
+        }
+
+        private static List<Asset> InitializeAssets() => new List<Asset>
+        {
+            new Asset("Laptop", "Dell", "XPS 13", 1200, new DateTime(2019, 10, 15), "USA"),
+            new Asset("Mobiltelefon", "Samsung", "Galaxy S10", 800, new DateTime(2019, 8, 1), "Tyskland"),
+            new Asset("Laptop", "HP", "Spectre x360", 1300, new DateTime(2021, 6, 1), "USA"),
+            new Asset("Mobiltelefon", "Apple", "iPhone 12", 999, new DateTime(2021, 11, 15), "Tyskland"),
+            new Asset("Laptop", "Apple", "MacBook Pro", 2400, new DateTime(2022, 5, 10), "Tyskland"),
+            new Asset("Mobiltelefon", "Google", "Pixel 5", 699, new DateTime(2022, 3, 15), "Storbritannien"),
+            new Asset("Laptop", "Lenovo", "ThinkPad X1", 1500, new DateTime(2023, 1, 20), "Tyskland"),
+            new Asset("Mobiltelefon", "OnePlus", "OnePlus 9", 799, new DateTime(2023, 4, 25), "Storbritannien"),
+            new Asset("Laptop", "Asus", "ZenBook", 1400, new DateTime(2022, 7, 20), "USA"),
+            new Asset("Mobiltelefon", "Xiaomi", "Mi 11", 749, new DateTime(2022, 10, 1), "Tyskland"),
+            new Asset("Mobiltelefon", "Sony", "Xperia 5", 899, new DateTime(2023, 2, 5), "Storbritannien"),
+            new Asset("Laptop", "Razer", "Blade 15", 2500, new DateTime(2023, 3, 12), "USA"),
+            new Asset("Mobiltelefon", "Nokia", "G50", 299, new DateTime(2021, 5, 1), "Storbritannien"),
+            new Asset("Laptop", "Acer", "Aspire 5", 600, new DateTime(2023, 5, 10), "Sverige"),
+            new Asset("Mobiltelefon", "Huawei", "P30", 599, new DateTime(2021, 4, 20), "Sverige"),
+        };
     }
 
-    // Förklaring av färgerna
-    private void DisplayColorExplanation()
+    class Asset
     {
-        Console.WriteLine();
-        Console.WriteLine("Färgförklaring:");
+        public string AssetType { get; }
+        public string Brand { get; }
+        public string Model { get; }
+        public decimal Price { get; }
+        public DateTime PurchaseDate { get; }
+        public string Country { get; }
 
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("GRÖN   : Tillgången har mer än 6 månader kvar till utgång.");
-        Console.ResetColor();
-
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine("GUL    : Tillgången har mindre än 6 månader men mer än 3 månader kvar till utgång.");
-        Console.ResetColor();
-
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine("RÖD    : Tillgången har mindre än 3 månader kvar till utgång.");
-        Console.ResetColor();
-
-        Console.ForegroundColor = ConsoleColor.Gray;
-        Console.WriteLine("GRÅ    : Tillgången har passerat 3 år och är utgången.");
-        Console.ResetColor();
-    }
-}
-
-class Program
-{
-    static void Main(string[] args)
-    {
-        AssetTracker assetTracker = new AssetTracker();
-
-        // Lägger till fler laptops och telefoner som faller in i olika intervall (grön, gul, röd, utgången)
-
-        // Laptops
-        assetTracker.AddAsset("HP", "Elitebook", new DateTime(2022, 11, 15), 12000m, "Dator");
-        assetTracker.AddAsset("Dell", "XPS 13", new DateTime(2020, 5, 25), 15000m, "Dator");
-        assetTracker.AddAsset("Lenovo", "ThinkPad", new DateTime(2020, 4, 1), 14000m, "Dator");
-        assetTracker.AddAsset("Asus", "Zenbook", new DateTime(2023, 1, 20), 14000m, "Dator");
-        assetTracker.AddAsset("Acer", "Aspire 5", new DateTime(2021, 12, 1), 10000m, "Dator");
-        assetTracker.AddAsset("Apple", "MacBook Air", new DateTime(2021, 7, 1), 18000m, "Dator");
-        assetTracker.AddAsset("MSI", "Prestige 14", new DateTime(2021, 6, 5), 21000m, "Dator");
-        // Telefoner
-        assetTracker.AddAsset("Iphone", "13 Pro", new DateTime(2021, 9, 1), 13000m, "Telefon");
-        assetTracker.AddAsset("Samsung", "Galaxy S21", new DateTime(2022, 7, 5), 10500m, "Telefon");
-        assetTracker.AddAsset("Nokia", "G50", new DateTime(2021, 10, 20), 4000m, "Telefon");
-        assetTracker.AddAsset("ROG", "Phone 5", new DateTime(2021, 2, 10), 8500m, "Telefon");
-        assetTracker.AddAsset("Nothing", "Phone 1", new DateTime(2022, 11, 10), 8000m, "Telefon");
-        assetTracker.AddAsset("Iphone", "8", new DateTime(2019, 10, 10), 7000m, "Telefon");
-
-        // Visa sorterade tillgångar
-        assetTracker.DisplayAssetsSorted();
+        public Asset(string assetType, string brand, string model, decimal price, DateTime purchaseDate, string country)
+        {
+            AssetType = assetType;
+            Brand = brand;
+            Model = model;
+            Price = price;
+            PurchaseDate = purchaseDate;
+            Country = country;
+        }
     }
 }
